@@ -70,7 +70,7 @@ The dataset is imbalanced, with fewer positive (death) cases.
 
 <img width="836" height="516" alt="截屏2026-01-29 15 55 18" src="https://github.com/user-attachments/assets/fea3466f-ec06-4173-a8d2-9e831f1538bb" />
 
-Based on multiple admissions per patient (using admissions table):
+Based on multiple admissions per patient:
 
 - Not readmitted (label2 = 0): 38,983 admissions  
 - Readmitted (label2 = 1): 19,993 admissions  
@@ -98,7 +98,7 @@ Most admissions are shorter than one week, but some long stays increase the aver
 
 <img width="836" height="490" alt="截屏2026-01-29 16 45 08" src="https://github.com/user-attachments/assets/12fe1cfe-16a5-4128-ae81-24c7beaca307" />
 
-Based on medication records from the prescriptions table (BigQuery):
+Based on medication records from the prescriptions table:
 
 - Admissions with at least one medication record: 50,216 admissions
 - Average number of medication orders per admission: 82.8
