@@ -35,7 +35,9 @@ Main clinical tables (`mimiciii_clinical`) include:
 ## 4) Cohort statistics
 
 <img width="835" height="339" alt="截屏2026-01-29 13 57 09" src="https://github.com/user-attachments/assets/6dbae1b0-b34e-4b9e-b2d1-e742961645f6" />
+
 <img width="839" height="334" alt="截屏2026-01-29 13 58 40" src="https://github.com/user-attachments/assets/cd48463a-183d-41fa-aa4c-983e75eff2ab" />
+
 <img width="842" height="339" alt="截屏2026-01-29 14 00 48" src="https://github.com/user-attachments/assets/97907726-33c5-4abb-b1ab-02ec04e9f8ac" />
 
 From BigQuery:
