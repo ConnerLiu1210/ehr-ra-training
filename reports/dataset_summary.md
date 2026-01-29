@@ -78,7 +78,7 @@ Based on multiple admissions per patient (using admissions table):
 Interpretation:  
 Admissions from patients with more than one hospital admission are labeled as readmitted. 
 
-## 7) Label3 distribution (length of stay, LOS)
+## 8) Label3 distribution (length of stay, LOS)
 
 <img width="838" height="489" alt="截屏2026-01-29 16 28 31" src="https://github.com/user-attachments/assets/5b9dc30f-9edc-491d-a2a6-ea164b4333bc" />
 
