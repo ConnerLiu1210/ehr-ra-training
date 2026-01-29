@@ -54,3 +54,14 @@ Gender distribution (from `patients`):
 - Female: 20,399 (43.85%)
 - Male: 26,121 (56.15%)
 
+  
+### Label distribution (mortality)
+
+<img width="835" height="369" alt="截屏2026-01-29 15 37 21" src="https://github.com/user-attachments/assets/599d7018-09db-49b1-9572-14965c4cfcf8" />
+
+Based on `hospital_expire_flag` in the `admissions` table:
+
+- Death (label = 1): 5,854 admissions (9.93%)
+- Survived (label = 0): 53,122 admissions (90.07%)
+
+The dataset is imbalanced, with fewer positive (death) cases.
