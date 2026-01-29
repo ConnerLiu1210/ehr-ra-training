@@ -82,7 +82,7 @@ Admissions from patients with more than one hospital admission are labeled as re
 
 <img width="838" height="489" alt="截屏2026-01-29 16 28 31" src="https://github.com/user-attachments/assets/5b9dc30f-9edc-491d-a2a6-ea164b4333bc" />
 
-Based on hospital length of stay from the admissions table (BigQuery):
+Based on hospital length of stay from the admissions table:
 
 - Mean LOS: 10.1 days  
 - Q1: 4 days  
