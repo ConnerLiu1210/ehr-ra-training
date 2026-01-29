@@ -55,7 +55,7 @@ Gender distribution (from `patients`):
 - Male: 26,121 (56.15%)
 
   
-### Label distribution (mortality)
+## 6） Label1 distribution (mortality)
 
 <img width="835" height="369" alt="截屏2026-01-29 15 37 21" src="https://github.com/user-attachments/assets/599d7018-09db-49b1-9572-14965c4cfcf8" />
 
@@ -66,7 +66,7 @@ Based on `hospital_expire_flag` in the `admissions` table:
 
 The dataset is imbalanced, with fewer positive (death) cases.
 
-## Label2 distribution (readmission)
+## 7） Label2 distribution (readmission)
 
 <img width="836" height="516" alt="截屏2026-01-29 15 55 18" src="https://github.com/user-attachments/assets/fea3466f-ec06-4173-a8d2-9e831f1538bb" />
 
