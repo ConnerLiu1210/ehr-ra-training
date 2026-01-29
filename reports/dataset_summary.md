@@ -65,3 +65,15 @@ Based on `hospital_expire_flag` in the `admissions` table:
 - Survived (label = 0): 53,122 admissions (90.07%)
 
 The dataset is imbalanced, with fewer positive (death) cases.
+
+## Label2 distribution (readmission)
+
+<img width="836" height="516" alt="截屏2026-01-29 15 55 18" src="https://github.com/user-attachments/assets/fea3466f-ec06-4173-a8d2-9e831f1538bb" />
+
+Based on multiple admissions per patient (using admissions table):
+
+- Not readmitted (label2 = 0): 38,983 admissions  
+- Readmitted (label2 = 1): 19,993 admissions  
+
+Interpretation:  
+Admissions from patients with more than one hospital admission are labeled as readmitted.  
