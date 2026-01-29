@@ -91,3 +91,17 @@ Based on hospital length of stay from the admissions table:
 
 Interpretation:  
 Most admissions are shorter than one week, but some long stays increase the average LOS.
+
+## 9) Label4 distribution (medication records)
+
+<img width="836" height="489" alt="截屏2026-01-29 16 43 15" src="https://github.com/user-attachments/assets/403e0e17-f11a-4098-8bef-f488fa9239b5" />
+
+<img width="836" height="490" alt="截屏2026-01-29 16 45 08" src="https://github.com/user-attachments/assets/12fe1cfe-16a5-4128-ae81-24c7beaca307" />
+
+Based on medication records from the prescriptions table (BigQuery):
+
+- Admissions with at least one medication record: 50,216 admissions
+- Average number of medication orders per admission: 82.8
+
+Interpretation:  
+Most hospital admissions include medication records, and patients typically receive a large number of medication orders during a single hospital stay, reflecting the complexity of ICU and inpatient care.
