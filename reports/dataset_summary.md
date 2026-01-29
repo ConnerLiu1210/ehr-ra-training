@@ -76,4 +76,18 @@ Based on multiple admissions per patient (using admissions table):
 - Readmitted (label2 = 1): 19,993 admissions  
 
 Interpretation:  
-Admissions from patients with more than one hospital admission are labeled as readmitted.  
+Admissions from patients with more than one hospital admission are labeled as readmitted. 
+
+## 7) Label3 distribution (length of stay, LOS)
+
+<img width="836" height="516" alt="截屏2026-01-29 15 55 18" src="https://github.com/user-attachments/assets/584cfa85-4a81-4451-8a33-b8ea358d88a1" />
+
+Based on hospital length of stay from the admissions table (BigQuery):
+
+- Mean LOS: 10.1 days  
+- Q1: 4 days  
+- Median: 6 days  
+- Q3: 12 days  
+
+Interpretation:  
+Most admissions are shorter than one week, but some long stays increase the average LOS.
