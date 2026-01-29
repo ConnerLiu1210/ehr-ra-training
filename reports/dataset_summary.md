@@ -80,7 +80,7 @@ Admissions from patients with more than one hospital admission are labeled as re
 
 ## 7) Label3 distribution (length of stay, LOS)
 
-<img width="836" height="516" alt="截屏2026-01-29 15 55 18" src="https://github.com/user-attachments/assets/584cfa85-4a81-4451-8a33-b8ea358d88a1" />
+<img width="838" height="489" alt="截屏2026-01-29 16 28 31" src="https://github.com/user-attachments/assets/5b9dc30f-9edc-491d-a2a6-ea164b4333bc" />
 
 Based on hospital length of stay from the admissions table (BigQuery):
 
