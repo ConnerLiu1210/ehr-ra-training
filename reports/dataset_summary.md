@@ -63,7 +63,8 @@ Based on `hospital_expire_flag` in the `admissions` table:
 
 - Death (label = 1): 5,854 admissions (9.93%)
 - Survived (label = 0): 53,122 admissions (90.07%)
-
+  
+Interpretation:  
 The dataset is imbalanced, with fewer positive (death) cases.
 
 ## 7） Label2 distribution (readmission)
