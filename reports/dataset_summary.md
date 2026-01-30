@@ -48,7 +48,8 @@ From BigQuery:
 
 ## 5) Basic demographics & labels
 
-<img width="840" height="340" alt="截屏2026-01-29 14 03 10" src="https://github.com/user-attachments/assets/b8f9b39f-edfc-440d-8e74-cafa030bcf47" />
+<img width="842" height="363" alt="截屏2026-01-29 14 01 17" src="https://github.com/user-attachments/assets/9fe33e1d-ccde-4996-8e9b-a73c5debff5c" />
+
 
 Gender distribution (from `patients`):
 - Female: 20,399 (43.85%)
