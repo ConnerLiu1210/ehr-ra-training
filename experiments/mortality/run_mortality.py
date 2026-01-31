@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 from pyhealth.datasets import MIMIC3Dataset
-from pyhealth.tasks import MortalityPrediction
+from pyhealth.tasks import mortality_prediction_mimic3_fn
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
 
 def main():
