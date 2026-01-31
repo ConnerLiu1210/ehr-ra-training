@@ -19,6 +19,6 @@
   - Medications (PRESCRIPTIONS)
 
 ## 3. Baseline Model Results
-- Model: PyHealth baseline model
+- Model: PyHealth baseline model (Logistic Regression )
 - AUC, AUPRC, F1
 
