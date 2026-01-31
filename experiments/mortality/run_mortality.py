@@ -17,7 +17,7 @@ def main():
     # Load MIMIC-III dataset
     dataset = MIMIC3Dataset(
         root=os.path.expanduser("~/data/mimiciii"),
-        tables=["ADMISSIONS", "DIAGNOSES_ICD", "LABEVENTS", "PRESCRIPTIONS"],
+        tables=["DIAGNOSES_ICD", "LABEVENTS", "PRESCRIPTIONS"],
     )
 
     # Define in-hospital mortality prediction task (first 24h)
