@@ -103,8 +103,12 @@ def main():
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
     # Initialize Transformer using dataset metadata
-    model = Transformer(dataset=train_ds)
-
+    model = Transformer(
+        dataset=train_ds,
+        feature_keys=["labs"],
+        label_key="label",
+        mode="binary",
+    )
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Trainer handles training loop + metric computation
