@@ -9,7 +9,6 @@ from datetime import timedelta
 import numpy as np
 import torch
 
-
 from pyhealth.datasets import MIMIC3Dataset, split_by_patient, get_dataloader
 from pyhealth.models import Transformer
 from pyhealth.trainer import Trainer
