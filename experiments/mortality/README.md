@@ -1,5 +1,5 @@
 # Mortality 
-This folder runs a simple in-hospital mortality baseline using only LABEVENTS from the first 48 hours of each hospital admission.
+This folder runs a simple in-hospital mortality baseline using LABEVENTS from the first 48 hours of each hospital admission.
 
 ## Task
 Predict in-hospital mortality:
