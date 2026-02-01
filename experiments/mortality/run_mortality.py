@@ -114,7 +114,7 @@ def main():
     # Trainer handles training loop + metric computation
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    trainer.train(train_loader=train_loader, val_loader=val_loader, epochs=5)
+    trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=5)
 
     # Evaluate
     test_metrics = trainer.evaluate(test_loader)
