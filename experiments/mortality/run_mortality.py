@@ -94,16 +94,20 @@ def main():
     task_dataset = dataset.set_task(mortality_48h_lite_fn)
 
     # Split patient
-    train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
+    train_ds, val_ds, test_ds = split_by_patient(
+        task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed
+    )
 
-    # Wrap datasets into dataloaders
+    # Build dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
-    # Initialize Transformer using dataset metadata
+    # IMPORTANT: Transformer expects a PyHealth dataset (not torch Subset)
+    base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
+
     model = Transformer(
-        dataset=train_ds,
+        dataset=base_ds,
         feature_keys=["labs"],
         label_key="label",
         mode="binary",
