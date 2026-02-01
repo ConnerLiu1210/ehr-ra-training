@@ -1,0 +1,121 @@
+2026-02-01 16:57:37 Transformer(
+  (embeddings): ModuleDict(
+    (labs): Embedding(693, 128, padding_idx=0)
+    (rx): Embedding(3941, 128, padding_idx=0)
+  )
+  (linear_layers): ModuleDict()
+  (transformer): ModuleDict(
+    (labs): TransformerLayer(
+      (transformer): ModuleList(
+        (0): TransformerBlock(
+          (attention): MultiHeadedAttention(
+            (linear_layers): ModuleList(
+              (0-2): 3 x Linear(in_features=128, out_features=128, bias=False)
+            )
+            (output_linear): Linear(in_features=128, out_features=128, bias=False)
+            (attention): Attention()
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (feed_forward): PositionwiseFeedForward(
+            (w_1): Linear(in_features=128, out_features=512, bias=True)
+            (w_2): Linear(in_features=512, out_features=128, bias=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+            (activation): GELU(approximate='none')
+          )
+          (input_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (output_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (dropout): Dropout(p=0.5, inplace=False)
+        )
+      )
+    )
+    (rx): TransformerLayer(
+      (transformer): ModuleList(
+        (0): TransformerBlock(
+          (attention): MultiHeadedAttention(
+            (linear_layers): ModuleList(
+              (0-2): 3 x Linear(in_features=128, out_features=128, bias=False)
+            )
+            (output_linear): Linear(in_features=128, out_features=128, bias=False)
+            (attention): Attention()
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (feed_forward): PositionwiseFeedForward(
+            (w_1): Linear(in_features=128, out_features=512, bias=True)
+            (w_2): Linear(in_features=512, out_features=128, bias=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+            (activation): GELU(approximate='none')
+          )
+          (input_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (output_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (dropout): Dropout(p=0.5, inplace=False)
+        )
+      )
+    )
+  )
+  (fc): Linear(in_features=256, out_features=1, bias=True)
+)
+2026-02-01 16:57:37 Metrics: ['roc_auc', 'pr_auc', 'f1']
+2026-02-01 16:57:37 Device: cuda
+2026-02-01 16:57:37 
+2026-02-01 16:57:37 Training:
+2026-02-01 16:57:37 Batch size: 32
+2026-02-01 16:57:37 Optimizer: <class 'torch.optim.adam.Adam'>
+2026-02-01 16:57:37 Optimizer params: {'lr': 0.001}
+2026-02-01 16:57:37 Weight decay: 0.0
+2026-02-01 16:57:37 Max grad norm: None
+2026-02-01 16:57:37 Val dataloader: <torch.utils.data.dataloader.DataLoader object at 0x14e19f898dc0>
+2026-02-01 16:57:37 Monitor: None
+2026-02-01 16:57:37 Monitor criterion: max
+2026-02-01 16:57:37 Epochs: 5
+2026-02-01 16:57:37 
+2026-02-01 16:57:57 --- Train epoch-0, step-1442 ---
+2026-02-01 16:57:57 loss: 0.3261
+2026-02-01 16:57:58 --- Eval epoch-0, step-1442 ---
+2026-02-01 16:57:58 roc_auc: 0.4583
+2026-02-01 16:57:58 pr_auc: 0.0157
+2026-02-01 16:57:58 f1: 0.0000
+2026-02-01 16:57:58 loss: 0.1311
+2026-02-01 16:57:58 
+2026-02-01 16:58:17 --- Train epoch-1, step-2884 ---
+2026-02-01 16:58:17 loss: 0.1693
+2026-02-01 16:58:18 --- Eval epoch-1, step-2884 ---
+2026-02-01 16:58:18 roc_auc: 0.4848
+2026-02-01 16:58:18 pr_auc: 0.0267
+2026-02-01 16:58:18 f1: 0.0190
+2026-02-01 16:58:18 loss: 0.1360
+2026-02-01 16:58:18 
+2026-02-01 16:58:38 --- Train epoch-2, step-4326 ---
+2026-02-01 16:58:38 loss: 0.1560
+2026-02-01 16:58:39 --- Eval epoch-2, step-4326 ---
+2026-02-01 16:58:39 roc_auc: 0.4597
+2026-02-01 16:58:39 pr_auc: 0.0154
+2026-02-01 16:58:39 f1: 0.0000
+2026-02-01 16:58:39 loss: 0.1422
+2026-02-01 16:58:39 
+2026-02-01 16:58:58 --- Train epoch-3, step-5768 ---
+2026-02-01 16:58:58 loss: 0.1479
+2026-02-01 16:59:00 --- Eval epoch-3, step-5768 ---
+2026-02-01 16:59:00 roc_auc: 0.5325
+2026-02-01 16:59:00 pr_auc: 0.0213
+2026-02-01 16:59:00 f1: 0.0000
+2026-02-01 16:59:00 loss: 0.1114
+2026-02-01 16:59:00 
+2026-02-01 16:59:19 --- Train epoch-4, step-7210 ---
+2026-02-01 16:59:19 loss: 0.1414
+2026-02-01 16:59:21 --- Eval epoch-4, step-7210 ---
+2026-02-01 16:59:21 roc_auc: 0.4758
+2026-02-01 16:59:21 pr_auc: 0.0159
+2026-02-01 16:59:21 f1: 0.0000
+2026-02-01 16:59:21 loss: 0.1317
