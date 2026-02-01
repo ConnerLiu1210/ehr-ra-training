@@ -157,7 +157,7 @@ def main():
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
-    base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else
+    base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
 
 
     model = Transformer(
