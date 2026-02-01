@@ -1,6 +1,6 @@
 # Mortality
 
-This folder runs a simple in-hospital mortality baseline using LABEVENTS + CHARTEVENTS from the first 48 hours of each hospital admission.
+This folder runs a simple in-hospital mortality baseline using LABEVENTS from the first 48 hours of each hospital admission.
 
 ## Task
 
@@ -12,7 +12,6 @@ Predict in-hospital mortality:
 ## Features
 
 - LABEVENTS item IDs occurring within the first 48 hours after admission
-- CHARTEVENTS item IDs (chart / vitals-related events) occurring within the first 48 hours after admission
 
 
 ## Model

@@ -1,6 +1,6 @@
 # run_mortality.py
 # Task: In-hospital mortality
-# Features: LABEVENTS + CHARTEVENTS within first 48 hours of each hospital admission
+# Features: LABEVENTS within first 48 hours of each hospital admission
 # Model: PyHealth built-in Transformer
 # Metrics: AUC, AUPRC, F1
 
@@ -16,8 +16,7 @@ from pyhealth.trainer import Trainer
 # Prediction window length
 WINDOW_HOURS = 48
 
-
-def mortality_48h_labs_vitals_fn(patient):
+def mortality_48h_lite_fn(patient):
     # Build a list of training samples for ONE patient
     samples = []
     window = timedelta(hours=WINDOW_HOURS)
@@ -26,9 +25,10 @@ def mortality_48h_labs_vitals_fn(patient):
     for i in range(len(patient)):
         visit = patient[i]
 
-        # Admission start time
+        # Admission start time (field name may vary by dataset/version)
         admit = getattr(visit, "encounter_time", None) or getattr(visit, "start_time", None)
         if admit is None:
+            # If we cannot find a start time, we cannot apply the 48h filter
             continue
 
         # End time of the observation window
@@ -38,48 +38,36 @@ def mortality_48h_labs_vitals_fn(patient):
         ds = getattr(visit, "discharge_status", None)
         label = int(ds) if ds in [0, 1] else 0
 
-        # LABEVENTS
+        # Pull LABEVENTS for this visit; if not available, use empty list
         try:
-            lab_evs = visit.get_event_list(table="LABEVENTS")
+            evs = visit.get_event_list(table="LABEVENTS")
         except Exception:
-            lab_evs = []
+            evs = []
 
-        lab_codes = []
-        for ev in lab_evs:
+        # Collect lab item IDs within [admit, admit + 48h]
+        codes = []
+        for ev in evs:
+
             t = getattr(ev, "timestamp", None) or getattr(ev, "charttime", None) or getattr(ev, "time", None)
             if t is None:
                 continue
+
+            # Keep only events in the first 48 hours
             if admit <= t <= end:
                 c = getattr(ev, "code", None) or getattr(ev, "itemid", None) or getattr(ev, "ITEMID", None)
                 if c is not None:
-                    lab_codes.append(str(c))
+                    codes.append(str(c))
 
-        # CHARTEVENTS
-        try:
-            chart_evs = visit.get_event_list(table="CHARTEVENTS")
-        except Exception:
-            chart_evs = []
-
-        vital_codes = []
-        for ev in chart_evs:
-            t = getattr(ev, "timestamp", None) or getattr(ev, "charttime", None) or getattr(ev, "time", None)
-            if t is None:
-                continue
-            if admit <= t <= end:
-                c = getattr(ev, "code", None) or getattr(ev, "itemid", None) or getattr(ev, "ITEMID", None)
-                if c is not None:
-                    vital_codes.append(str(c))
-
-        # Skip visits with no events in the window
-        if (not lab_codes) and (not vital_codes):
+        # Skip visits with no labs in the window
+        if not codes:
             continue
 
+        # Each sample is a dict; keys become model inputs
         samples.append(
             {
                 "patient_id": patient.patient_id,
                 "visit_id": visit.visit_id,
-                "labs": [lab_codes] if lab_codes else [[]],
-                "vitals": [vital_codes] if vital_codes else [[]],
+                "labs": [codes],
                 "label": label,
             }
         )
@@ -99,36 +87,39 @@ def main():
     # Load MIMIC-III tables
     dataset = MIMIC3Dataset(
         root=data_root,
-        tables=["LABEVENTS", "CHARTEVENTS"],
+        tables=["LABEVENTS"],
     )
 
     # Apply the task function to convert raw visits into (x, y) samples
-    task_dataset = dataset.set_task(mortality_48h_labs_vitals_fn)
+    task_dataset = dataset.set_task(mortality_48h_lite_fn)
 
-    # Split by patient
-    train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
+    # Split patient
+    # Split patient
+    train_ds, val_ds, test_ds = split_by_patient(
+        task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed
+    )
 
-    # Wrap datasets into dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
+
+    # split_by_patient returns torch.utils.data.Subset
+    # Transformer needs the underlying PyHealth dataset for tokenization
     base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
 
-    # Initialize Transformer using dataset metadata
     model = Transformer(
         dataset=base_ds,
-        feature_keys=["labs", "vitals"],
+        feature_keys=["labs"],  # must match your sample key
         label_key="label",
         mode="binary",
     )
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Trainer handles training loop + metric computation
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # Train
-    trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=5)
+    # Train for a few epochs
+    trainer.train(train_loader=train_loader, val_loader=val_loader, epochs=5)
 
     # Evaluate
     test_metrics = trainer.evaluate(test_loader)
@@ -138,7 +129,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     results = {
-        "task": "in-hospital mortality, features=first 48h LABEVENTS + CHARTEVENTS",
+        "task": "in-hospital mortality, features=first 48h LABEVENTS",
         "model": "Transformer",
         "window_hours": WINDOW_HOURS,
         "metrics": {
