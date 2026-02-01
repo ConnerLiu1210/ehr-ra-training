@@ -1,22 +1,83 @@
 # run_mortality.py
-# Baseline: In-hospital Mortality (MIMIC-III)
+# Task: In-hospital mortality
+# Features: LABEVENTS within first 48 hours of each hospital admission
 # Model: PyHealth built-in Transformer
-# Metrics: ROC-AUC, PR-AUC (AUPRC), F1
+# Metrics: AUC, AUPRC, F1
 
-import os
-import json
-import random
+import os, json, random
+from datetime import timedelta
 import numpy as np
 import torch
 
 from pyhealth.datasets import MIMIC3Dataset, split_by_patient, get_dataloader
-from pyhealth.tasks import mortality_prediction_mimic3_fn
 from pyhealth.models import Transformer
 from pyhealth.trainer import Trainer
 
+# Prediction window length
+WINDOW_HOURS = 48
+
+
+def mortality_48h_lite_fn(patient):
+    # Build a list of training samples for ONE patient
+    samples = []
+    window = timedelta(hours=WINDOW_HOURS)
+
+    # patient is iterable over visits (hospital admissions)
+    for i in range(len(patient)):
+        visit = patient[i]
+
+        # Admission start time (field name may vary by dataset/version)
+        admit = getattr(visit, "encounter_time", None) or getattr(visit, "start_time", None)
+        if admit is None:
+            # If we cannot find a start time, we cannot apply the 48h filter
+            continue
+
+        # End time of the observation window
+        end = admit + window
+
+        # Label: 1 if died in hospital, 0 otherwise
+        ds = getattr(visit, "discharge_status", None)
+        label = int(ds) if ds in [0, 1] else 0
+
+        # Pull LABEVENTS for this visit; if not available, use empty list
+        try:
+            evs = visit.get_event_list(table="LABEVENTS")
+        except Exception:
+            evs = []
+
+        # Collect lab item IDs within [admit, admit + 48h]
+        codes = []
+        for ev in evs:
+
+            t = getattr(ev, "timestamp", None) or getattr(ev, "charttime", None) or getattr(ev, "time", None)
+            if t is None:
+                continue
+
+            # Keep only events in the first 48 hours
+            if admit <= t <= end:
+                c = getattr(ev, "code", None) or getattr(ev, "itemid", None) or getattr(ev, "ITEMID", None)
+                if c is not None:
+                    codes.append(str(c))
+
+        # Skip visits with no labs in the window
+        if not codes:
+            continue
+
+        # Each sample is a dict; keys become model inputs
+        samples.append(
+            {
+                "patient_id": patient.patient_id,
+                "visit_id": visit.visit_id,
+                "labs": [codes],
+                "label": label,
+            }
+        )
+
+    return samples
+
 
 def main():
-    # reproducibility
+    # Reproducibility
     seed = 42
     random.seed(seed)
     np.random.seed(seed)
@@ -24,65 +85,45 @@ def main():
 
     data_root = os.path.expanduser("~/data/mimiciii")
 
-    # Observation window in minutes (e.g., 48h)
-    prediction_window = 48 * 60
-
-    # Load raw MIMIC-III tables
+    # Load MIMIC-III tables
     dataset = MIMIC3Dataset(
         root=data_root,
-        tables=[
-            "DIAGNOSES_ICD",
-            "PROCEDURES_ICD",
-        ],
+        tables=["LABEVENTS"],
     )
 
-    # Convert raw tables into task samples
-    task_dataset = dataset.set_task(
-        mortality_prediction_mimic3_fn,
-    )
+    # Apply the task function to convert raw visits into (x, y) samples
+    task_dataset = dataset.set_task(mortality_48h_lite_fn)
 
-    # Split
-    train_ds, val_ds, test_ds = split_by_patient(
-        task_dataset,
-        ratios=[0.8, 0.1, 0.1],
-        seed=seed,
-    )
+    # Split patient
+    train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
 
-    # Build dataloaders for training/evaluation
+    # Wrap datasets into dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
-    # Initialize Transformer model for dataset
+    # Initialize Transformer using dataset metadata
     model = Transformer(dataset=train_ds)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # training loop & metric computation
-    trainer = Trainer(
-        model=model,
-        device=device,
-        metrics=["roc_auc", "pr_auc", "f1"],
-    )
+    # Trainer handles training loop + metric computation
+    trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # Train the model
-    trainer.train(
-        train_loader=train_loader,
-        val_loader=val_loader,
-        epochs=5,
-    )
+    # Train for a few epochs (increase epochs for better performance)
+    trainer.train(train_loader=train_loader, val_loader=val_loader, epochs=5)
 
-    # Evaluate on test split
+    # Evaluate
     test_metrics = trainer.evaluate(test_loader)
 
-    # Save metrics to a JSON file
+    # Save metrics
     out_dir = os.path.join("experiments", "mortality", "results")
     os.makedirs(out_dir, exist_ok=True)
 
     results = {
-        "task": "in-hospital mortality (mimic-iii)",
+        "task": "in-hospital mortality, features=first 48h LABEVENTS",
         "model": "Transformer",
-        "prediction_window_minutes": int(prediction_window),
+        "window_hours": WINDOW_HOURS,
         "metrics": {
             "auc": float(test_metrics.get("roc_auc", np.nan)),
             "auprc": float(test_metrics.get("pr_auc", np.nan)),
