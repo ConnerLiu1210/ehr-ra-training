@@ -118,7 +118,7 @@ def main():
     # Trainer handles training loop + metric computation
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # Train for a few epochs (increase epochs for better performance)
+    # Train for a few epochs
     trainer.train(train_loader=train_loader, val_loader=val_loader, epochs=5)
 
     # Evaluate
