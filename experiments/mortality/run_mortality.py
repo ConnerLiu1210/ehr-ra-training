@@ -1,7 +1,7 @@
 # run_mortality.py
 # Task: In-hospital mortality
 # Features: LABEVENTS within first 48 hours of each hospital admission
-# Model: PyHealth built-in Transformer
+# Model: PyHealth Transformer
 # Metrics: AUC, AUPRC, F1
 
 import os, json, random
@@ -25,7 +25,7 @@ def mortality_48h_lite_fn(patient):
     for i in range(len(patient)):
         visit = patient[i]
 
-        # Admission start time (field name may vary by dataset/version)
+        # Admission start time
         admit = getattr(visit, "encounter_time", None) or getattr(visit, "start_time", None)
         if admit is None:
             # If we cannot find a start time, we cannot apply the 48h filter
@@ -62,7 +62,6 @@ def mortality_48h_lite_fn(patient):
         if not codes:
             continue
 
-        # Each sample is a dict; keys become model inputs
         samples.append(
             {
                 "patient_id": patient.patient_id,
@@ -94,7 +93,6 @@ def main():
     task_dataset = dataset.set_task(mortality_48h_lite_fn)
 
     # Split patient
-    # Split patient
     train_ds, val_ds, test_ds = split_by_patient(
         task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed
     )
@@ -103,8 +101,6 @@ def main():
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
-    # split_by_patient returns torch.utils.data.Subset
-    # Transformer needs the underlying PyHealth dataset for tokenization
     base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
 
     model = Transformer(
@@ -118,7 +114,6 @@ def main():
     # Trainer handles training loop + metric computation
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # Train for a few epochs
     trainer.train(train_loader=train_loader, val_loader=val_loader, epochs=5)
 
     # Evaluate
