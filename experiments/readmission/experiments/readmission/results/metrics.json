@@ -1,11 +1,11 @@
 {
-  "task": "30-day readmission, features=first 7d (capped by discharge) LABEVENTS+PRESCRIPTIONS",
+  "task": "30-day readmission, features=first 7d LABEVENTS+PRESCRIPTIONS+DIAGNOSES_ICD+PROCEDURES_ICD",
   "model": "Transformer",
   "window_days": 7,
   "readmit_days": 30,
   "metrics": {
-    "auc": 0.5943322657840534,
-    "auprc": 0.08259752833946146,
-    "f1": 0.0
+    "auc": 0.6230962582481087,
+    "auprc": 0.08316075579343991,
+    "f1": 0.039660056657223795
   }
 }
