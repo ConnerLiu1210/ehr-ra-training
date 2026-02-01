@@ -9,7 +9,6 @@ Predict in-hospital mortality:
 ## Features
 Only lab item IDs (LABEVENTS) occurring within the first 48 hours after admission.
 
-
 ## Model
 - pyhealth.models.Transformer
 
