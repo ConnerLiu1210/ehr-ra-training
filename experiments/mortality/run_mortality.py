@@ -16,7 +16,6 @@ from pyhealth.trainer import Trainer
 # Prediction window length
 WINDOW_HOURS = 48
 
-
 def mortality_48h_lite_fn(patient):
     # Build a list of training samples for ONE patient
     samples = []
