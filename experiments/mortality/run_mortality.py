@@ -16,6 +16,7 @@ from pyhealth.trainer import Trainer
 # Prediction window length
 WINDOW_HOURS = 48
 
+
 def mortality_48h_lite_fn(patient):
     # Build a list of training samples for ONE patient
     samples = []
@@ -94,32 +95,28 @@ def main():
     task_dataset = dataset.set_task(mortality_48h_lite_fn)
 
     # Split patient
-    # Split patient
-    train_ds, val_ds, test_ds = split_by_patient(
-        task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed
-    )
+    train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
 
+    # Wrap datasets into dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
+    base_ds = train_ds.dataset if hasattr(train_ds,"dataset") else train_ds
 
-    # split_by_patient returns torch.utils.data.Subset
-    # Transformer needs the underlying PyHealth dataset for tokenization
-    base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
+    # Initialize Transformer using dataset metadata
+    model = Transformer(dataset=base_ds,
+                        feature_keys=["labs"],
+                        label_key="label",
+                        mode="binary",
+                       )
 
-    model = Transformer(
-        dataset=base_ds,
-        feature_keys=["labs"],  # must match your sample key
-        label_key="label",
-        mode="binary",
-    )
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Trainer handles training loop + metric computation
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # Train for a few epochs
-    trainer.train(train_loader=train_loader, val_loader=val_loader, epochs=5)
+    # Train for a few epochs (increase epochs for better performance)
+    trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=5)
 
     # Evaluate
     test_metrics = trainer.evaluate(test_loader)
