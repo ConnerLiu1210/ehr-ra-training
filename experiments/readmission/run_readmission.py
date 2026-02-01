@@ -1,6 +1,7 @@
 # run_readmission.py
 # Task: 30-day readmission
 # Features: events within first 7 days of each hospital admission
+# Tables: LABEVENTS + PRESCRIPTIONS
 # Model: PyHealth built-in Transformer
 # Metrics: AUC, AUPRC, F1
 
@@ -13,14 +14,12 @@ from pyhealth.datasets import MIMIC3Dataset, split_by_patient, get_dataloader
 from pyhealth.models import Transformer
 from pyhealth.trainer import Trainer
 
-# Observation window: first 7 days after admission
 WINDOW_DAYS = 7
-
-# Outcome window: readmitted within 30 days after discharge
 READMIT_DAYS = 30
 
 
-def _get_time(obj, keys):
+def get_time(obj, keys):
+    # Return the first non-None attribute value from a list of candidate attribute names
     for k in keys:
         v = getattr(obj, k, None)
         if v is not None:
@@ -28,51 +27,58 @@ def _get_time(obj, keys):
     return None
 
 
-def _get_event_time(ev):
-    return _get_time(ev, ["timestamp", "charttime", "time", "event_time", "datetime"])
+def get_event_time(ev):
+    # Try common time fields used by different PyHealth event objects
+    return get_time(ev, ["timestamp", "charttime", "time", "event_time", "datetime"])
 
 
-def _get_event_code(ev):
-    c = _get_time(ev, ["code", "itemid", "ITEMID", "drug", "drug_name", "ndc", "rxnorm", "medication"])
-    return None if c is None else str(c)
+def get_event_code(ev):
+    # Try common code fields for labs/medications and return as a string
+    c = get_time(ev, ["code", "itemid", "ITEMID", "ndc", "rxnorm", "drug", "drug_name"])
+    if c is None:
+        return None
+    return str(c)
 
 
 def readmission_7d_30d_fn(patient):
+    # Build samples for ONE patient
+    # x: codes from LABEVENTS + PRESCRIPTIONS within first 7 days after admission (capped by discharge)
+    # y: 1 if next admission occurs within 30 days after discharge, else 0
+
     samples = []
     obs_window = timedelta(days=WINDOW_DAYS)
     y_window = timedelta(days=READMIT_DAYS)
 
-    # iterate each admission
-    for i in range(len(patient)):
-        visit = patient[i]
+    # Collect visits and sort by admission time
+    visits = []
+    for v in patient:
+        admit = get_time(v, ["encounter_time", "start_time", "admit_time", "admittime"])
+        if admit is not None:
+            visits.append((admit, v))
+    visits.sort(key=lambda x: x[0])
+    visits = [v for _, v in visits]
 
-        # admission start time
-        admit = _get_time(visit, ["encounter_time", "start_time", "admit_time", "admittime"])
-        if admit is None:
+    for i, visit in enumerate(visits):
+        admit = get_time(visit, ["encounter_time", "start_time", "admit_time", "admittime"])
+        discharge = get_time(visit, ["discharge_time", "end_time", "dischtime", "discharge_datetime"])
+        if admit is None or discharge is None:
             continue
 
-        # discharge / end time
-        discharge = _get_time(visit, ["discharge_time", "end_time", "dischtime", "discharge_datetime"])
-        if discharge is None:
-            # without discharge, cannot define the 30-day post-discharge label
-            continue
-
-        # observation end: min(admit+7d, discharge)
+        # Observation end = min(admit + 7 days, discharge)
         obs_end = admit + obs_window
         if discharge < obs_end:
             obs_end = discharge
 
-        # label: whether next admission is within 30 days after discharge
+        # Label from the next admission time
         label = 0
-        if i + 1 < len(patient):
-            next_visit = patient[i + 1]
-            next_admit = _get_time(next_visit, ["encounter_time", "start_time", "admit_time", "admittime"])
+        if i + 1 < len(visits):
+            next_visit = visits[i + 1]
+            next_admit = get_time(next_visit, ["encounter_time", "start_time", "admit_time", "admittime"])
             if next_admit is not None:
-                # readmission should be after discharge, and within discharge + 30 days
                 if discharge < next_admit <= (discharge + y_window):
                     label = 1
 
-        # collect LABEVENTS within observation window
+        # LABEVENTS codes in [admit, obs_end]
         lab_codes = []
         try:
             lab_evs = visit.get_event_list(table="LABEVENTS")
@@ -80,15 +86,15 @@ def readmission_7d_30d_fn(patient):
             lab_evs = []
 
         for ev in lab_evs:
-            t = _get_event_time(ev)
+            t = get_event_time(ev)
             if t is None:
                 continue
             if admit <= t <= obs_end:
-                c = _get_event_code(ev)
+                c = get_event_code(ev)
                 if c is not None:
                     lab_codes.append(c)
 
-        # collect PRESCRIPTIONS within observation window
+        # PRESCRIPTIONS codes in [admit, obs_end]
         rx_codes = []
         try:
             rx_evs = visit.get_event_list(table="PRESCRIPTIONS")
@@ -96,21 +102,27 @@ def readmission_7d_30d_fn(patient):
             rx_evs = []
 
         for ev in rx_evs:
-            t = _get_event_time(ev)
-            if t is None:
-                # PRESCRIPTIONS sometimes has no event time in some pipelines; skip if missing
+            c = get_event_code(ev)
+            if c is None:
                 continue
-            if admit <= t <= obs_end:
-                c = _get_event_code(ev)
-                if c is not None:
-                    rx_codes.append(c)
 
-        # skip admissions with no features at all
+            t = get_event_time(ev)
+
+            # If prescription has no timestamp, only include it when stay <= 7 days
+            # This avoids leaking prescriptions that could happen after day 7
+            if t is None:
+                if discharge <= (admit + obs_window):
+                    rx_codes.append(c)
+                continue
+
+            if admit <= t <= obs_end:
+                rx_codes.append(c)
+
+        # Skip admissions with no features
         if (not lab_codes) and (not rx_codes):
             continue
 
-
-        # wrap the codes as a single-visit sequence
+        # PyHealth expects list-of-visits for each feature key
         samples.append(
             {
                 "patient_id": patient.patient_id,
@@ -125,7 +137,6 @@ def readmission_7d_30d_fn(patient):
 
 
 def main():
-    # reproducibility
     seed = 42
     random.seed(seed)
     np.random.seed(seed)
@@ -133,26 +144,21 @@ def main():
 
     data_root = os.path.expanduser("~/data/mimiciii")
 
-    # load MIMIC-III tables
     dataset = MIMIC3Dataset(
         root=data_root,
         tables=["LABEVENTS", "PRESCRIPTIONS"],
     )
 
-    # apply task function -> (x, y) samples
     task_dataset = dataset.set_task(readmission_7d_30d_fn)
 
-    # patient-level split
     train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
 
-    # dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
     base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
 
-    # model
     model = Transformer(
         dataset=base_ds,
         feature_keys=["labs", "rx"],
@@ -162,16 +168,13 @@ def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # trainer
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # train
-    trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=5)
+    # Train longer but keep it simple
+    trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=10)
 
-    # eval
     test_metrics = trainer.evaluate(test_loader)
 
-    # save metrics
     out_dir = os.path.join("experiments", "readmission", "results")
     os.makedirs(out_dir, exist_ok=True)
 
