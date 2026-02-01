@@ -13,7 +13,6 @@ Predict in-hospital mortality:
 
 - LABEVENTS item IDs occurring within the first 48 hours after admission
 
-
 ## Model
 
 - pyhealth.models.Transformer
