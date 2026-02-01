@@ -31,7 +31,6 @@ def main():
     dataset = MIMIC3Dataset(
         root=data_root,
         tables=[
-            "ADMISSIONS",
             "DIAGNOSES_ICD",
             "PROCEDURES_ICD",
         ],
