@@ -3,7 +3,6 @@
 ## 1) Dataset chosen
 I use the MIMIC-III dataset (BigQuery public dataset: `physionet-data.mimiciii_*`).
 
-
 ## 2) Data source, population, and time range
 
 <img width="840" height="340" alt="截屏2026-01-29 14 03 10" src="https://github.com/user-attachments/assets/036f05f3-0cd5-45fe-96a4-d06f4bb49a15" />
