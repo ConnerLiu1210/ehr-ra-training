@@ -62,7 +62,6 @@ def mortality_48h_lite_fn(patient):
         if not codes:
             continue
 
-        # Each sample is a dict; keys become model inputs
         samples.append(
             {
                 "patient_id": patient.patient_id,
@@ -90,7 +89,6 @@ def main():
         tables=["LABEVENTS"],
     )
 
-    # Apply the task function to convert raw visits into (x, y) samples
     task_dataset = dataset.set_task(mortality_48h_lite_fn)
 
     # Split patient
@@ -114,7 +112,6 @@ def main():
     # Trainer handles training loop + metric computation
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
-    # Train for a few epochs 
     trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=5)
 
     # Evaluate
