@@ -26,7 +26,7 @@ def mortality_48h_lite_fn(patient):
     for i in range(len(patient)):
         visit = patient[i]
 
-        # Admission start time (field name may vary by dataset/version)
+        # Admission start time 
         admit = getattr(visit, "encounter_time", None) or getattr(visit, "start_time", None)
         if admit is None:
             # If we cannot find a start time, we cannot apply the 48h filter
