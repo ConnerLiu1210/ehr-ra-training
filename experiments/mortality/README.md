@@ -1,33 +1,24 @@
-# Experiment: In-hospital Mortality Prediction (MIMIC-III)
+# In-hospital Mortality Baseline (MIMIC-III)
 
-This folder contains a baseline experiment for predicting in-hospital mortality using MIMIC-III and PyHealth.
+This folder contains a simple baseline experiment for predicting in-hospital mortality using MIMIC-III and PyHealth.
 
 ## Task
+- Dataset: MIMIC-III 
 - Level: admission-level
-- Objective: predict whether a patient dies during a hospital admission
+- Label: in-hospital mortality (from `hospital_expire_flag` via PyHealth task)
+- Observation window: first 48 hours after admission (`prediction_window = 48 * 60` minutes)
 
-## Label
-- Source: MIMIC-III `ADMISSIONS`
-- Label: in-hospital mortality (from the PyHealth task function)
-- Positive (1): died in hospital
-- Negative (0): survived
-
-## Prediction setting
-- Index time: admission time
-- Observation window: first 48 hours after admission
-- Target: in-hospital mortality outcome
-
-## Features (used by the PyHealth task)
-- Diagnoses: `DIAGNOSES_ICD`
-- Procedures: `PROCEDURES_ICD`
-
-## Baseline model
-- Model: RETAIN (PyHealth built-in)
+## Model
+- Model: Transformer (`pyhealth.models.Transformer`)
 
 ## Metrics
-- AUC (ROC-AUC)
-- AUPRC (PR-AUC)
+- ROC-AUC
+- PR-AUC (AUPRC)
 - F1
 
-## Outputs
-- experiments/mortality/results/metrics.json
+## Files
+- `run_mortality.py`: trains and evaluates the Transformer baseline
+- `experiments/mortality/results/metrics.json`: saved test metrics output
+
+After running, check:
+- `experiments/mortality/results/metrics.json`

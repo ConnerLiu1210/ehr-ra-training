@@ -83,7 +83,7 @@ def main():
 
     results = {
         "task": "in-hospital mortality (mimic-iii)",
-        "model": "Transformer (pyhealth built-in)",
+        "model": "Transformer",
         "prediction_window_minutes": int(prediction_window),
         "metrics": {
             "auc": float(test_metrics.get("roc_auc", np.nan)),
