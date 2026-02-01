@@ -1,24 +1,33 @@
-# Task: In-hospital Mortality Prediction (MIMIC-III)
+# Experiment: In-hospital Mortality Prediction (MIMIC-III)
 
-## 1. Task Definition and Label
+This folder contains a baseline experiment for predicting in-hospital mortality using MIMIC-III and PyHealth.
+
+## Task
 - Level: admission-level
 - Objective: predict whether a patient dies during a hospital admission
-- Label source table: ADMISSIONS
-- Label name: hospital_expire_flag
-- Positive class (1): patient died in hospital
-- Negative class (0): patient survived
-- Class imbalance:  10% positive, 90% negative
 
-## 2. Features and Time Window
-- Index time: hospital admission time
-- Observation window: first 24 hours after admission
-- Prediction target: in-hospital mortality
-- Data sources:
-  - Diagnoses (DIAGNOSES_ICD)
-  - Laboratory events (LABEVENTS)
-  - Medications (PRESCRIPTIONS)
+## Label
+- Source: MIMIC-III `ADMISSIONS`
+- Label: in-hospital mortality (from the PyHealth task function)
+- Positive (1): died in hospital
+- Negative (0): survived
 
-## 3. Baseline Model Results
-- Model: PyHealth baseline model (Logistic Regression )
-- AUC, AUPRC, F1
+## Prediction setting
+- Index time: admission time
+- Observation window: first 48 hours after admission
+- Target: in-hospital mortality outcome
 
+## Features (used by the PyHealth task)
+- Diagnoses: `DIAGNOSES_ICD`
+- Procedures: `PROCEDURES_ICD`
+
+## Baseline model
+- Model: RETAIN (PyHealth built-in)
+
+## Metrics
+- AUC (ROC-AUC)
+- AUPRC (PR-AUC)
+- F1
+
+## Outputs
+- experiments/mortality/results/metrics.json
