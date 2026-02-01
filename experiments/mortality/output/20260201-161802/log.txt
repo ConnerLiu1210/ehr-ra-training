@@ -1,0 +1,91 @@
+2026-02-01 16:18:02 Transformer(
+  (embeddings): ModuleDict(
+    (labs): Embedding(668, 128, padding_idx=0)
+  )
+  (linear_layers): ModuleDict()
+  (transformer): ModuleDict(
+    (labs): TransformerLayer(
+      (transformer): ModuleList(
+        (0): TransformerBlock(
+          (attention): MultiHeadedAttention(
+            (linear_layers): ModuleList(
+              (0-2): 3 x Linear(in_features=128, out_features=128, bias=False)
+            )
+            (output_linear): Linear(in_features=128, out_features=128, bias=False)
+            (attention): Attention()
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (feed_forward): PositionwiseFeedForward(
+            (w_1): Linear(in_features=128, out_features=512, bias=True)
+            (w_2): Linear(in_features=512, out_features=128, bias=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+            (activation): GELU(approximate='none')
+          )
+          (input_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (output_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (dropout): Dropout(p=0.5, inplace=False)
+        )
+      )
+    )
+  )
+  (fc): Linear(in_features=128, out_features=1, bias=True)
+)
+2026-02-01 16:18:02 Metrics: ['roc_auc', 'pr_auc', 'f1']
+2026-02-01 16:18:02 Device: cuda
+2026-02-01 16:18:02 
+2026-02-01 16:18:02 Training:
+2026-02-01 16:18:02 Batch size: 32
+2026-02-01 16:18:02 Optimizer: <class 'torch.optim.adam.Adam'>
+2026-02-01 16:18:02 Optimizer params: {'lr': 0.001}
+2026-02-01 16:18:02 Weight decay: 0.0
+2026-02-01 16:18:02 Max grad norm: None
+2026-02-01 16:18:02 Val dataloader: <torch.utils.data.dataloader.DataLoader object at 0x14f8c93b65c0>
+2026-02-01 16:18:02 Monitor: None
+2026-02-01 16:18:02 Monitor criterion: max
+2026-02-01 16:18:02 Epochs: 5
+2026-02-01 16:18:02 
+2026-02-01 16:18:13 --- Train epoch-0, step-1426 ---
+2026-02-01 16:18:13 loss: 0.5529
+2026-02-01 16:18:14 --- Eval epoch-0, step-1426 ---
+2026-02-01 16:18:14 roc_auc: 0.7483
+2026-02-01 16:18:14 pr_auc: 0.2824
+2026-02-01 16:18:14 f1: 0.1426
+2026-02-01 16:18:14 loss: 0.2975
+2026-02-01 16:18:14 
+2026-02-01 16:18:25 --- Train epoch-1, step-2852 ---
+2026-02-01 16:18:25 loss: 0.3147
+2026-02-01 16:18:26 --- Eval epoch-1, step-2852 ---
+2026-02-01 16:18:26 roc_auc: 0.7948
+2026-02-01 16:18:26 pr_auc: 0.3106
+2026-02-01 16:18:26 f1: 0.2396
+2026-02-01 16:18:26 loss: 0.2817
+2026-02-01 16:18:26 
+2026-02-01 16:18:36 --- Train epoch-2, step-4278 ---
+2026-02-01 16:18:36 loss: 0.3042
+2026-02-01 16:18:37 --- Eval epoch-2, step-4278 ---
+2026-02-01 16:18:37 roc_auc: 0.7862
+2026-02-01 16:18:37 pr_auc: 0.3287
+2026-02-01 16:18:37 f1: 0.2110
+2026-02-01 16:18:37 loss: 0.2788
+2026-02-01 16:18:37 
+2026-02-01 16:18:48 --- Train epoch-3, step-5704 ---
+2026-02-01 16:18:48 loss: 0.2930
+2026-02-01 16:18:49 --- Eval epoch-3, step-5704 ---
+2026-02-01 16:18:49 roc_auc: 0.7865
+2026-02-01 16:18:49 pr_auc: 0.3293
+2026-02-01 16:18:49 f1: 0.1552
+2026-02-01 16:18:49 loss: 0.2772
+2026-02-01 16:18:49 
+2026-02-01 16:19:00 --- Train epoch-4, step-7130 ---
+2026-02-01 16:19:00 loss: 0.2895
+2026-02-01 16:19:01 --- Eval epoch-4, step-7130 ---
+2026-02-01 16:19:01 roc_auc: 0.7999
+2026-02-01 16:19:01 pr_auc: 0.3353
+2026-02-01 16:19:01 f1: 0.2153
+2026-02-01 16:19:01 loss: 0.2731

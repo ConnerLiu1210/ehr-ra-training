@@ -1,0 +1,41 @@
+2026-02-01 16:13:43 Transformer(
+  (embeddings): ModuleDict(
+    (labs): Embedding(668, 128, padding_idx=0)
+  )
+  (linear_layers): ModuleDict()
+  (transformer): ModuleDict(
+    (labs): TransformerLayer(
+      (transformer): ModuleList(
+        (0): TransformerBlock(
+          (attention): MultiHeadedAttention(
+            (linear_layers): ModuleList(
+              (0-2): 3 x Linear(in_features=128, out_features=128, bias=False)
+            )
+            (output_linear): Linear(in_features=128, out_features=128, bias=False)
+            (attention): Attention()
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (feed_forward): PositionwiseFeedForward(
+            (w_1): Linear(in_features=128, out_features=512, bias=True)
+            (w_2): Linear(in_features=512, out_features=128, bias=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+            (activation): GELU(approximate='none')
+          )
+          (input_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (output_sublayer): SublayerConnection(
+            (norm): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+            (dropout): Dropout(p=0.5, inplace=False)
+          )
+          (dropout): Dropout(p=0.5, inplace=False)
+        )
+      )
+    )
+  )
+  (fc): Linear(in_features=128, out_features=1, bias=True)
+)
+2026-02-01 16:13:43 Metrics: ['roc_auc', 'pr_auc', 'f1']
+2026-02-01 16:13:43 Device: cuda
+2026-02-01 16:13:43 
