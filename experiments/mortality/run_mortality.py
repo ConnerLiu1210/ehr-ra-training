@@ -39,7 +39,6 @@ def main():
     # Convert raw tables into task samples
     task_dataset = dataset.set_task(
         mortality_prediction_mimic3_fn,
-        prediction_window=prediction_window,
     )
 
     # Split
