@@ -1,8 +1,10 @@
-# Task: los prediction (binary classification)
-# Observation: first OBS_DAYS after admission (capped at discharge)
-# Tables: LABEVENTS + PRESCRIPTIONS + DIAGNOSES_ICD + PROCEDURES_ICD + CHARTEVENTS
+# run_los.py
+# Task: Length of Stay (LOS) prediction as a binary classification
+# Observation window: first N days after admission (capped by discharge)
+# Tables: LABEVENTS + PRESCRIPTIONS + DIAGNOSES_ICD + PROCEDURES_ICD
 # Model: PyHealth built-in Transformer
 # Metrics: AUC, AUPRC, F1
+
 
 import os
 import json
@@ -16,20 +18,16 @@ from pyhealth.datasets import MIMIC3Dataset, split_by_patient, get_dataloader
 from pyhealth.models import Transformer
 from pyhealth.trainer import Trainer
 
-OBS_DAYS = 2
-LOS_THRESHOLD_DAYS = 6
+# Settings you can tune
+OBS_WINDOW_DAYS = 2
+LOS_THRESHOLD_DAYS = 7       # long stay threshold: LOS >= 7 days -> label 1
+MAX_CODES_PER_TABLE = 200    # cap per table per visit to avoid huge sequences
 
-# Keep sequences from exploding
-MAX_CODES_PER_TABLE = 200
-
-# Placeholder tokens to avoid empty features (prevents PyHealth validation errors)
+# Empty tokens to avoid empty feature lists (prevents validation issues)
 EMPTY_LAB = "__EMPTY_LAB__"
 EMPTY_RX = "__EMPTY_RX__"
 EMPTY_DX = "__EMPTY_DX__"
 EMPTY_PX = "__EMPTY_PX__"
-EMPTY_CHART = "__EMPTY_CHART__"
-EMPTY_DEMO = "__EMPTY_DEMO__"
-EMPTY_ICU = "__EMPTY_ICU__"
 
 
 def get_first_attr(obj, keys):
@@ -63,7 +61,6 @@ def wrap_feature(codes, empty_token):
     return [codes]
 
 
-# Visit / event field accessors
 def get_visit_admit_time(visit):
     return get_first_attr(visit, ["encounter_time", "start_time", "admit_time", "admittime"])
 
@@ -78,7 +75,7 @@ def get_event_time(ev):
 
 
 def get_event_code(ev):
-    # Common code fields for labs, meds, diagnoses, procedures, charts
+    # Common code fields for labs, meds, diagnoses, procedures
     c = get_first_attr(
         ev,
         ["code", "itemid", "ITEMID", "icd_code", "icd9_code", "ndc", "rxnorm", "drug", "drug_name"],
@@ -109,96 +106,16 @@ def filter_codes_in_window(events, admit, obs_end, allow_no_time):
     return dedup_and_cap(codes, MAX_CODES_PER_TABLE)
 
 
-def build_demo_tokens(patient, visit, admit):
-    # Build a small set of categorical tokens from patient/admission info
-    tokens = []
-
-    gender = get_first_attr(patient, ["gender", "sex"])
-    if gender is not None:
-        tokens.append("gender_" + str(gender))
-
-    ethnicity = get_first_attr(visit, ["ethnicity"])
-    if ethnicity is not None:
-        tokens.append("eth_" + str(ethnicity))
-
-    insurance = get_first_attr(visit, ["insurance"])
-    if insurance is not None:
-        tokens.append("ins_" + str(insurance))
-
-    admission_type = get_first_attr(visit, ["admission_type"])
-    if admission_type is not None:
-        tokens.append("admtype_" + str(admission_type))
-
-    dob = get_first_attr(patient, ["dob", "birth_datetime", "birthdate"])
-    if dob is not None and admit is not None:
-        try:
-            age = int((admit - dob).days / 365.25)
-            if age < 0:
-                age = 0
-            if age < 30:
-                tokens.append("agebin_<30")
-            elif age < 50:
-                tokens.append("agebin_30_49")
-            elif age < 70:
-                tokens.append("agebin_50_69")
-            else:
-                tokens.append("agebin_>=70")
-        except Exception:
-            pass
-
-    return tokens
-
-
-def build_icu_tokens(visit):
-    # ICU-related categorical tokens if available
-    tokens = []
-
-    first_careunit = get_first_attr(visit, ["first_careunit", "first_care_unit"])
-    if first_careunit is not None:
-        tokens.append("icu_first_" + str(first_careunit))
-
-    last_careunit = get_first_attr(visit, ["last_careunit", "last_care_unit"])
-    if last_careunit is not None:
-        tokens.append("icu_last_" + str(last_careunit))
-
-    los = get_first_attr(visit, ["los", "icu_los"])
-    if los is not None:
-        try:
-            los = float(los)
-            if los < 1:
-                tokens.append("iculos_<1d")
-            elif los < 3:
-                tokens.append("iculos_1_3d")
-            elif los < 7:
-                tokens.append("iculos_3_7d")
-            else:
-                tokens.append("iculos_>=7d")
-        except Exception:
-            pass
-
-    return tokens
-
-
-def get_samples_list(ds):
-    # split_by_patient often returns torch.utils.data.Subset
-    if hasattr(ds, "samples"):
-        return ds.samples
-    if hasattr(ds, "dataset") and hasattr(ds, "indices") and hasattr(ds.dataset, "samples"):
-        return [ds.dataset.samples[i] for i in ds.indices]
-    try:
-        return [ds[i] for i in range(len(ds))]
-    except Exception:
-        return []
-
-
-def los_long_fn(patient):
+def los_early_fn(patient):
     # Build samples for ONE patient
-    # x: codes from multiple tables within first OBS_DAYS after admission (capped by discharge)
-    # y: 1 if los >= LOS_THRESHOLD_DAYS else 0
+    # x: codes within first OBS_WINDOW_DAYS after admission
+    # y: 1 if LOS >= LOS_THRESHOLD_DAYS else 0
 
     samples = []
-    obs_window = timedelta(days=OBS_DAYS)
+    obs_window = timedelta(days=OBS_WINDOW_DAYS)
+    los_threshold = timedelta(days=LOS_THRESHOLD_DAYS)
 
+    # Sort visits by admission time
     visits = []
     for v in patient:
         a = get_visit_admit_time(v)
@@ -213,20 +130,16 @@ def los_long_fn(patient):
         if admit is None or discharge is None:
             continue
 
-        try:
-            los_days = (discharge - admit).total_seconds() / 86400.0
-        except Exception:
-            continue
+        # LOS and label
+        los = discharge - admit
+        label = 1 if los >= los_threshold else 0
 
-        label = 1 if los_days >= float(LOS_THRESHOLD_DAYS) else 0
-
-        # Observation end = min(admit + OBS_DAYS, discharge)
+        # Observation end = min(admit + obs_window, discharge)
         obs_end = admit + obs_window
         if discharge < obs_end:
             obs_end = discharge
 
-        # If the whole stay is within obs window, allow "no timestamp" items
-        stay_leq_obs = discharge <= (admit + obs_window)
+        stay_within_obs = discharge <= (admit + obs_window)
 
         # LABEVENTS
         try:
@@ -240,43 +153,24 @@ def los_long_fn(patient):
             rx_evs = visit.get_event_list(table="PRESCRIPTIONS")
         except Exception:
             rx_evs = []
-        rx_codes = filter_codes_in_window(rx_evs, admit, obs_end, allow_no_time=stay_leq_obs)
+        rx_codes = filter_codes_in_window(rx_evs, admit, obs_end, allow_no_time=stay_within_obs)
 
         # DIAGNOSES_ICD
         try:
             dx_evs = visit.get_event_list(table="DIAGNOSES_ICD")
         except Exception:
             dx_evs = []
-        dx_codes = filter_codes_in_window(dx_evs, admit, obs_end, allow_no_time=stay_leq_obs)
+        dx_codes = filter_codes_in_window(dx_evs, admit, obs_end, allow_no_time=stay_within_obs)
 
         # PROCEDURES_ICD
         try:
             px_evs = visit.get_event_list(table="PROCEDURES_ICD")
         except Exception:
             px_evs = []
-        px_codes = filter_codes_in_window(px_evs, admit, obs_end, allow_no_time=stay_leq_obs)
+        px_codes = filter_codes_in_window(px_evs, admit, obs_end, allow_no_time=stay_within_obs)
 
-        # CHARTEVENTS
-        try:
-            chart_evs = visit.get_event_list(table="CHARTEVENTS")
-        except Exception:
-            chart_evs = []
-        chart_codes = filter_codes_in_window(chart_evs, admit, obs_end, allow_no_time=False)
-
-        # Extra categorical tokens
-        demo_tokens = dedup_and_cap(build_demo_tokens(patient, visit, admit), 50)
-        icu_tokens = dedup_and_cap(build_icu_tokens(visit), 50)
-
-        # Skip if everything is missing
-        if (
-            len(lab_codes) == 0
-            and len(rx_codes) == 0
-            and len(dx_codes) == 0
-            and len(px_codes) == 0
-            and len(chart_codes) == 0
-            and len(demo_tokens) == 0
-            and len(icu_tokens) == 0
-        ):
+        # Skip admissions with absolutely no usable features
+        if len(lab_codes) == 0 and len(rx_codes) == 0 and len(dx_codes) == 0 and len(px_codes) == 0:
             continue
 
         samples.append(
@@ -287,14 +181,25 @@ def los_long_fn(patient):
                 "rx": wrap_feature(rx_codes, EMPTY_RX),
                 "dx": wrap_feature(dx_codes, EMPTY_DX),
                 "px": wrap_feature(px_codes, EMPTY_PX),
-                "chart": wrap_feature(chart_codes, EMPTY_CHART),
-                "demo": wrap_feature(demo_tokens, EMPTY_DEMO),
-                "icu": wrap_feature(icu_tokens, EMPTY_ICU),
-                "label": label,
+                "label": int(label),
             }
         )
 
     return samples
+
+
+def get_labels_from_dataset(ds):
+    # split_by_patient may return a Subset-like object
+    if hasattr(ds, "samples"):
+        return [s["label"] for s in ds.samples]
+
+    # Try Subset pattern: ds.dataset.samples + ds.indices
+    base = getattr(ds, "dataset", None)
+    idxs = getattr(ds, "indices", None)
+    if base is not None and idxs is not None and hasattr(base, "samples"):
+        return [base.samples[i]["label"] for i in idxs]
+
+    return []
 
 
 def main():
@@ -308,19 +213,20 @@ def main():
 
     dataset = MIMIC3Dataset(
         root=data_root,
-        tables=["LABEVENTS", "PRESCRIPTIONS", "DIAGNOSES_ICD", "PROCEDURES_ICD", "CHARTEVENTS"],
+        tables=["LABEVENTS", "PRESCRIPTIONS", "DIAGNOSES_ICD", "PROCEDURES_ICD"],
     )
 
-    task_dataset = dataset.set_task(los_long_fn)
+    task_dataset = dataset.set_task(los_early_fn)
 
+    # Patient-level split
     train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
 
-    # Label prevalence check (Subset-safe)
-    train_samples = get_samples_list(train_ds)
-    y_train = [s["label"] for s in train_samples if isinstance(s, dict) and "label" in s]
+    # Label prevalence check
+    y_train = get_labels_from_dataset(train_ds)
     pos_rate = float(np.mean(y_train)) if len(y_train) > 0 else float("nan")
-    print("Train samples:", len(train_samples), "Pos rate:", pos_rate)
+    print("Train label=1 rate:", pos_rate, "Train count:", len(y_train))
 
+    # Dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
@@ -329,30 +235,31 @@ def main():
 
     model = Transformer(
         dataset=base_ds,
-        feature_keys=["labs", "rx", "dx", "px", "chart", "demo", "icu"],
+        feature_keys=["labs", "rx", "dx", "px"],
         label_key="label",
         mode="binary",
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
+    # Train
     trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=10)
 
+    # Evaluate
     test_metrics = trainer.evaluate(test_loader)
 
+    # Save results
     out_dir = os.path.join("experiments", "los", "results")
     os.makedirs(out_dir, exist_ok=True)
 
-
     results = {
-        "task": "los long stay classification",
+        "task": "LOS binary prediction",
+        "label": f"LOS >= {LOS_THRESHOLD_DAYS} days",
+        "observation_window_days": OBS_WINDOW_DAYS,
+        "tables": ["LABEVENTS", "PRESCRIPTIONS", "DIAGNOSES_ICD", "PROCEDURES_ICD"],
         "model": "Transformer",
-        "obs_days": OBS_DAYS,
-        "los_threshold_days": LOS_THRESHOLD_DAYS,
         "max_codes_per_table": MAX_CODES_PER_TABLE,
-        "tables": ["LABEVENTS", "PRESCRIPTIONS", "DIAGNOSES_ICD", "PROCEDURES_ICD", "CHARTEVENTS"],
         "metrics": {
             "auc": float(test_metrics.get("roc_auc", np.nan)),
             "auprc": float(test_metrics.get("pr_auc", np.nan)),
