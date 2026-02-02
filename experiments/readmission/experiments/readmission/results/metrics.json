@@ -1,11 +1,12 @@
 {
-  "task": "30-day readmission, features=first 7d LABEVENTS+PRESCRIPTIONS+DIAGNOSES_ICD+PROCEDURES_ICD",
+  "task": "30-day readmission, features=first 7d + demo/icu tokens",
   "model": "Transformer",
   "window_days": 7,
   "readmit_days": 30,
+  "max_codes_per_table": 200,
   "metrics": {
-    "auc": 0.6230962582481087,
-    "auprc": 0.08316075579343991,
-    "f1": 0.039660056657223795
+    "auc": 0.6146538266401281,
+    "auprc": 0.08941134069824823,
+    "f1": 0.0498960498960499
   }
 }
