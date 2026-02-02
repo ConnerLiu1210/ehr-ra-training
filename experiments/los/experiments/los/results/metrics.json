@@ -1,0 +1,18 @@
+{
+  "task": "LOS binary prediction",
+  "label": "LOS >= 7 days",
+  "observation_window_days": 2,
+  "tables": [
+    "LABEVENTS",
+    "PRESCRIPTIONS",
+    "DIAGNOSES_ICD",
+    "PROCEDURES_ICD"
+  ],
+  "model": "Transformer",
+  "max_codes_per_table": 200,
+  "metrics": {
+    "auc": 0.7880820156112632,
+    "auprc": 0.7437784437352761,
+    "f1": 0.7027984413744244
+  }
+}
