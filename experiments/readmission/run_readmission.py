@@ -2,6 +2,7 @@
 # Task: 30-day readmission
 # Features: events within first 7 days after admission
 # Tables: LABEVENTS + PRESCRIPTIONS + DIAGNOSES_ICD + PROCEDURES_ICD
+# Extra tokens: demographics/admission/ICU info as simple categorical tokens
 # Model: PyHealth built-in Transformer
 # Metrics: AUC, AUPRC, F1
 
@@ -19,6 +20,9 @@ from pyhealth.trainer import Trainer
 
 WINDOW_DAYS = 7
 READMIT_DAYS = 30
+
+# Keep sequences from exploding
+MAX_CODES_PER_TABLE = 200
 
 
 def get_first_attr(obj, keys):
@@ -51,6 +55,20 @@ def get_event_code(ev):
     return str(c)
 
 
+def dedup_and_cap(codes, max_len):
+    # Remove duplicates while keeping order, then cap length
+    seen = set()
+    out = []
+    for c in codes:
+        if c in seen:
+            continue
+        seen.add(c)
+        out.append(c)
+        if len(out) >= max_len:
+            break
+    return out
+
+
 def filter_codes_in_window(events, admit, obs_end, allow_no_time):
     # Collect codes whose event time falls in [admit, obs_end]
     # If time is missing, include only when allow_no_time is True
@@ -69,7 +87,79 @@ def filter_codes_in_window(events, admit, obs_end, allow_no_time):
         if admit <= t <= obs_end:
             codes.append(code)
 
-    return codes
+    return dedup_and_cap(codes, MAX_CODES_PER_TABLE)
+
+
+def build_demo_tokens(patient, visit, admit):
+    # Build a small set of categorical tokens from patient/admission info
+    tokens = []
+
+    gender = get_first_attr(patient, ["gender", "sex"])
+    if gender is not None:
+        tokens.append("gender_" + str(gender))
+
+    ethnicity = get_first_attr(visit, ["ethnicity"])
+    if ethnicity is not None:
+        tokens.append("eth_" + str(ethnicity))
+
+    insurance = get_first_attr(visit, ["insurance"])
+    if insurance is not None:
+        tokens.append("ins_" + str(insurance))
+
+    admission_type = get_first_attr(visit, ["admission_type"])
+    if admission_type is not None:
+        tokens.append("admtype_" + str(admission_type))
+
+    # Approximate age if DOB exists (MIMIC-III is de-identified; treat as rough)
+    dob = get_first_attr(patient, ["dob", "birth_datetime", "birthdate"])
+    if dob is not None and admit is not None:
+        try:
+            age = int((admit - dob).days / 365.25)
+            if age < 0:
+                age = 0
+            # Simple age bin
+            if age < 30:
+                tokens.append("agebin_<30")
+            elif age < 50:
+                tokens.append("agebin_30_49")
+            elif age < 70:
+                tokens.append("agebin_50_69")
+            else:
+                tokens.append("agebin_>=70")
+        except Exception:
+            pass
+
+    return tokens
+
+
+def build_icu_tokens(visit):
+    # ICU-related categorical tokens if available
+    tokens = []
+
+    first_careunit = get_first_attr(visit, ["first_careunit", "first_care_unit"])
+    if first_careunit is not None:
+        tokens.append("icu_first_" + str(first_careunit))
+
+    last_careunit = get_first_attr(visit, ["last_careunit", "last_care_unit"])
+    if last_careunit is not None:
+        tokens.append("icu_last_" + str(last_careunit))
+
+    los = get_first_attr(visit, ["los", "icu_los"])
+    if los is not None:
+        try:
+            los = float(los)
+            if los < 1:
+                tokens.append("iculos_<1d")
+            elif los < 3:
+                tokens.append("iculos_1_3d")
+            elif los < 7:
+                tokens.append("iculos_3_7d")
+            else:
+                tokens.append("iculos_>=7d")
+        except Exception:
+            pass
+
+    return tokens
 
 
 def readmission_7d_30d_fn(patient):
@@ -84,9 +174,9 @@ def readmission_7d_30d_fn(patient):
     # Sort visits by admission time to define "next admission"
     visits = []
     for v in patient:
-        admit = get_visit_admit_time(v)
-        if admit is not None:
-            visits.append((admit, v))
+        a = get_visit_admit_time(v)
+        if a is not None:
+            visits.append((a, v))
     visits.sort(key=lambda x: x[0])
     visits = [v for _, v in visits]
 
@@ -101,7 +191,7 @@ def readmission_7d_30d_fn(patient):
         if discharge < obs_end:
             obs_end = discharge
 
-        # If the whole stay is <= 7 days, then "no timestamp" items are safe to include
+        # If the whole stay is <= 7 days, then "no timestamp" items are safer to include
         stay_leq_7d = discharge <= (admit + obs_window)
 
         # Label: readmitted within 30 days after discharge
@@ -140,8 +230,12 @@ def readmission_7d_30d_fn(patient):
             px_evs = []
         px_codes = filter_codes_in_window(px_evs, admit, obs_end, allow_no_time=stay_leq_7d)
 
+        # Extra categorical tokens
+        demo_tokens = dedup_and_cap(build_demo_tokens(patient, visit, admit), 50)
+        icu_tokens = dedup_and_cap(build_icu_tokens(visit), 50)
+
         # Skip if no usable features
-        if (not lab_codes) and (not rx_codes) and (not dx_codes) and (not px_codes):
+        if (not lab_codes) and (not rx_codes) and (not dx_codes) and (not px_codes) and (not demo_tokens) and (not icu_tokens):
             continue
 
         # PyHealth expects list-of-visits for each feature key
@@ -153,6 +247,8 @@ def readmission_7d_30d_fn(patient):
                 "rx": [rx_codes] if rx_codes else [[]],
                 "dx": [dx_codes] if dx_codes else [[]],
                 "px": [px_codes] if px_codes else [[]],
+                "demo": [demo_tokens] if demo_tokens else [[]],
+                "icu": [icu_tokens] if icu_tokens else [[]],
                 "label": label,
             }
         )
@@ -169,7 +265,7 @@ def main():
 
     data_root = os.path.expanduser("~/data/mimiciii")
 
-    # Load tables (adding DIAGNOSES_ICD and PROCEDURES_ICD)
+    # Load tables for code events
     dataset = MIMIC3Dataset(
         root=data_root,
         tables=["LABEVENTS", "PRESCRIPTIONS", "DIAGNOSES_ICD", "PROCEDURES_ICD"],
@@ -181,6 +277,11 @@ def main():
     # Patient-level split to avoid leakage across admissions of the same patient
     train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
 
+    # Simple label prevalence check
+    y_train = [s["label"] for s in train_ds.samples]
+    pos_rate = float(np.mean(y_train)) if len(y_train) > 0 else float("nan")
+    print("Train samples:", len(train_ds.samples), "Pos rate:", pos_rate)
+
     # Dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
@@ -191,7 +292,7 @@ def main():
     # Model
     model = Transformer(
         dataset=base_ds,
-        feature_keys=["labs", "rx", "dx", "px"],
+        feature_keys=["labs", "rx", "dx", "px", "demo", "icu"],
         label_key="label",
         mode="binary",
     )
@@ -212,7 +313,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     results = {
-        "task": "30-day readmission, features=first 7d LABEVENTS+PRESCRIPTIONS+DIAGNOSES_ICD+PROCEDURES_ICD",
+        "task": "30-day readmission, features=first 7d + demo/icu tokens",
         "model": "Transformer",
         "window_days": WINDOW_DAYS,
         "readmit_days": READMIT_DAYS,
