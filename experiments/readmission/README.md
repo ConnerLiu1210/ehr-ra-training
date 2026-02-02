@@ -15,6 +15,13 @@ Events occurring within the first 7 days after admission (capped at discharge ti
 
 - LABEVENTS item IDs
 - PRESCRIPTIONS codes
+- DIAGNOSES_ICD codes
+- PROCEDURES_ICD codes
+
+## Extra simple categorical tokens (when available):
+- Demographics/admission tokens (gender, ethnicity, insurance, admission_type, age_bin)
+- ICU tokens (first_careunit, last_careunit, ICU length-of-stay bins)
+
 
 ## Model
 
@@ -25,6 +32,8 @@ Events occurring within the first 7 days after admission (capped at discharge ti
 - auc
 - auprc
 - f1
+- Note: F1 can be very low under class imbalance if using the default threshold (often 0.5).
+
 
 ## Files
 
