@@ -1,4 +1,4 @@
-# Task: LOS prediction (binary classification)
+# Task: los prediction (binary classification)
 # Observation: first OBS_DAYS after admission (capped at discharge)
 # Tables: LABEVENTS + PRESCRIPTIONS + DIAGNOSES_ICD + PROCEDURES_ICD + CHARTEVENTS
 # Model: PyHealth built-in Transformer
@@ -194,7 +194,7 @@ def get_samples_list(ds):
 def los_long_fn(patient):
     # Build samples for ONE patient
     # x: codes from multiple tables within first OBS_DAYS after admission (capped by discharge)
-    # y: 1 if LOS >= LOS_THRESHOLD_DAYS else 0
+    # y: 1 if los >= LOS_THRESHOLD_DAYS else 0
 
     samples = []
     obs_window = timedelta(days=OBS_DAYS)
@@ -346,7 +346,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     results = {
-        "task": "LOS long stay classification",
+        "task": "los long stay classification",
         "model": "Transformer",
         "obs_days": OBS_DAYS,
         "los_threshold_days": LOS_THRESHOLD_DAYS,
