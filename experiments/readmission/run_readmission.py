@@ -309,9 +309,14 @@ def main():
     train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
 
     # Simple label prevalence check
-    y_train = [s["label"] for s in train_ds.samples]
+    # NOTE: split_by_patient may return Subset objects, which do NOT have ".samples"
+    y_train = []
+    for i in range(len(train_ds)):
+        s = train_ds[i]
+        y_train.append(int(s["label"]))
+
     pos_rate = float(np.mean(y_train)) if len(y_train) > 0 else float("nan")
-    print("Train samples:", len(train_ds.samples), "Pos rate:", pos_rate)
+    print("Train samples:", len(y_train), "Pos rate:", pos_rate)
 
     # Dataloaders
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
