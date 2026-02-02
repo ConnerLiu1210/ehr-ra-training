@@ -1,6 +1,6 @@
 # run_readmission.py
-# Task: 30-day readmission
-# Features: events within first 7 days after admission
+# Task: 30-day readmission prediction
+# Observation: first 7 days after admission
 # Tables: LABEVENTS + PRESCRIPTIONS + DIAGNOSES_ICD + PROCEDURES_ICD
 # Extra tokens: demographics/admission/ICU info as simple categorical tokens
 # Model: PyHealth built-in Transformer
@@ -18,11 +18,20 @@ from pyhealth.datasets import MIMIC3Dataset, split_by_patient, get_dataloader
 from pyhealth.models import Transformer
 from pyhealth.trainer import Trainer
 
+# Global settings
 WINDOW_DAYS = 7
 READMIT_DAYS = 30
 
-# Keep sequences from exploding
+# Cap codes per table per visit to avoid huge sequences
 MAX_CODES_PER_TABLE = 200
+
+# Placeholder tokens to avoid empty features (prevents PyHealth validation errors)
+EMPTY_LAB = "__EMPTY_LAB__"
+EMPTY_RX = "__EMPTY_RX__"
+EMPTY_DX = "__EMPTY_DX__"
+EMPTY_PX = "__EMPTY_PX__"
+EMPTY_DEMO = "__EMPTY_DEMO__"
+EMPTY_ICU = "__EMPTY_ICU__"
 
 
 def get_first_attr(obj, keys):
@@ -32,27 +41,6 @@ def get_first_attr(obj, keys):
         if v is not None:
             return v
     return None
-
-
-def get_visit_admit_time(visit):
-    return get_first_attr(visit, ["encounter_time", "start_time", "admit_time", "admittime"])
-
-
-def get_visit_discharge_time(visit):
-    return get_first_attr(visit, ["discharge_time", "end_time", "dischtime", "discharge_datetime"])
-
-
-def get_event_time(ev):
-    # Common timestamp fields across different event objects
-    return get_first_attr(ev, ["timestamp", "charttime", "time", "event_time", "datetime"])
-
-
-def get_event_code(ev):
-    # Common code fields for labs, meds, diagnoses, procedures
-    c = get_first_attr(ev, ["code", "itemid", "ITEMID", "icd_code", "icd9_code", "ndc", "rxnorm", "drug", "drug_name"])
-    if c is None:
-        return None
-    return str(c)
 
 
 def dedup_and_cap(codes, max_len):
@@ -69,6 +57,40 @@ def dedup_and_cap(codes, max_len):
     return out
 
 
+def wrap_feature(codes, empty_token):
+    # PyHealth expects list-of-visits: [codes_for_this_visit]
+    # Never return [[]] because it can trigger "pop from an empty set" in validation
+    if codes is None or len(codes) == 0:
+        return [[empty_token]]
+    return [codes]
+
+
+# Visit / event field accessors
+def get_visit_admit_time(visit):
+    return get_first_attr(visit, ["encounter_time", "start_time", "admit_time", "admittime"])
+
+
+def get_visit_discharge_time(visit):
+    return get_first_attr(visit, ["discharge_time", "end_time", "dischtime", "discharge_datetime"])
+
+
+def get_event_time(ev):
+    # Common timestamp fields across different event objects
+    return get_first_attr(ev, ["timestamp", "charttime", "time", "event_time", "datetime"])
+
+
+def get_event_code(ev):
+    # Common code fields for labs, meds, diagnoses, procedures
+    c = get_first_attr(
+        ev,
+        ["code", "itemid", "ITEMID", "icd_code", "icd9_code", "ndc", "rxnorm", "drug", "drug_name"],
+    )
+    if c is None:
+        return None
+    return str(c)
+
+
+# Feature extraction helpers
 def filter_codes_in_window(events, admit, obs_end, allow_no_time):
     # Collect codes whose event time falls in [admit, obs_end]
     # If time is missing, include only when allow_no_time is True
@@ -117,7 +139,7 @@ def build_demo_tokens(patient, visit, admit):
             age = int((admit - dob).days / 365.25)
             if age < 0:
                 age = 0
-            # Simple age bin
+            # Simple age bins
             if age < 30:
                 tokens.append("agebin_<30")
             elif age < 50:
@@ -162,6 +184,7 @@ def build_icu_tokens(visit):
     return tokens
 
 
+# Task function: patient -> samples
 def readmission_7d_30d_fn(patient):
     # Build samples for ONE patient
     # x: codes from multiple tables within first 7 days after admission (capped by discharge)
@@ -234,21 +257,28 @@ def readmission_7d_30d_fn(patient):
         demo_tokens = dedup_and_cap(build_demo_tokens(patient, visit, admit), 50)
         icu_tokens = dedup_and_cap(build_icu_tokens(visit), 50)
 
-        # Skip if no usable features
-        if (not lab_codes) and (not rx_codes) and (not dx_codes) and (not px_codes) and (not demo_tokens) and (not icu_tokens):
+        # If everything is missing, skip this admission
+        if (
+            len(lab_codes) == 0
+            and len(rx_codes) == 0
+            and len(dx_codes) == 0
+            and len(px_codes) == 0
+            and len(demo_tokens) == 0
+            and len(icu_tokens) == 0
+        ):
             continue
 
-        # PyHealth expects list-of-visits for each feature key
+        # Return one-sample per admission
         samples.append(
             {
                 "patient_id": patient.patient_id,
                 "visit_id": visit.visit_id,
-                "labs": [lab_codes] if lab_codes else [[]],
-                "rx": [rx_codes] if rx_codes else [[]],
-                "dx": [dx_codes] if dx_codes else [[]],
-                "px": [px_codes] if px_codes else [[]],
-                "demo": [demo_tokens] if demo_tokens else [[]],
-                "icu": [icu_tokens] if icu_tokens else [[]],
+                "labs": wrap_feature(lab_codes, EMPTY_LAB),
+                "rx": wrap_feature(rx_codes, EMPTY_RX),
+                "dx": wrap_feature(dx_codes, EMPTY_DX),
+                "px": wrap_feature(px_codes, EMPTY_PX),
+                "demo": wrap_feature(demo_tokens, EMPTY_DEMO),
+                "icu": wrap_feature(icu_tokens, EMPTY_ICU),
                 "label": label,
             }
         )
@@ -256,6 +286,7 @@ def readmission_7d_30d_fn(patient):
     return samples
 
 
+# Main training pipeline
 def main():
     # Reproducibility
     seed = 42
@@ -271,7 +302,7 @@ def main():
         tables=["LABEVENTS", "PRESCRIPTIONS", "DIAGNOSES_ICD", "PROCEDURES_ICD"],
     )
 
-    # Convert patient objects to (feature, label) samples
+    # Convert patient objects to task samples
     task_dataset = dataset.set_task(readmission_7d_30d_fn)
 
     # Patient-level split to avoid leakage across admissions of the same patient
@@ -287,6 +318,7 @@ def main():
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
     test_loader = get_dataloader(test_ds, batch_size=64, shuffle=False)
 
+    # Base dataset object for the model (PyHealth uses it to build vocab, etc.)
     base_ds = train_ds.dataset if hasattr(train_ds, "dataset") else train_ds
 
     # Model
@@ -317,6 +349,7 @@ def main():
         "model": "Transformer",
         "window_days": WINDOW_DAYS,
         "readmit_days": READMIT_DAYS,
+        "max_codes_per_table": MAX_CODES_PER_TABLE,
         "metrics": {
             "auc": float(test_metrics.get("roc_auc", np.nan)),
             "auprc": float(test_metrics.get("pr_auc", np.nan)),
