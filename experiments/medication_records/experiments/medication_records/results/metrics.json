@@ -1,0 +1,11 @@
+{
+  "task": "Medication record prediction (binary)",
+  "model": "Transformer",
+  "observation_window_days": 2,
+  "max_codes_per_table": 200,
+  "metrics": {
+    "auc": 0.9410800443087951,
+    "auprc": 0.9881572324171111,
+    "f1": 0.948614261761515
+  }
+}
