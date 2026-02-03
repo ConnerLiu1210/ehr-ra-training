@@ -4,7 +4,7 @@
 # Features: early admission events within first OBS_DAYS
 # Tables (features): LABEVENTS + DIAGNOSES_ICD + PROCEDURES_ICD
 # Model: PyHealth Transformer
-# Metrics: AUC, AUPRC, F1
+# Output: auc, auprc, f1
 
 import os
 import json
@@ -196,15 +196,6 @@ def meds_task_fn(patient):
     return samples
 
 
-def label_stats(ds):
-    ys = [s["label"] for s in ds]
-    if len(ys) == 0:
-        return {"n": 0, "pos_rate": float("nan"), "pos": 0, "neg": 0}
-    pos = int(sum(ys))
-    neg = int(len(ys) - pos)
-    return {"n": len(ys), "pos_rate": float(np.mean(ys)), "pos": pos, "neg": neg}
-
-
 def main():
     seed = 42
     random.seed(seed)
@@ -219,15 +210,7 @@ def main():
     )
 
     task_dataset = dataset.set_task(meds_task_fn)
-
     train_ds, val_ds, test_ds = split_by_patient(task_dataset, ratios=[0.8, 0.1, 0.1], seed=seed)
-
-    tr = label_stats(train_ds)
-    va = label_stats(val_ds)
-    te = label_stats(test_ds)
-    print("Train:", tr)
-    print("Val:", va)
-    print("Test:", te)
 
     train_loader = get_dataloader(train_ds, batch_size=32, shuffle=True)
     val_loader = get_dataloader(val_ds, batch_size=64, shuffle=False)
@@ -246,36 +229,26 @@ def main():
     trainer = Trainer(model=model, device=device, metrics=["roc_auc", "pr_auc", "f1"])
 
     trainer.train(train_dataloader=train_loader, val_dataloader=val_loader, epochs=10)
-
     test_metrics = trainer.evaluate(test_loader)
 
     auc = float(test_metrics.get("roc_auc", np.nan))
     auprc = float(test_metrics.get("pr_auc", np.nan))
     f1 = float(test_metrics.get("f1", np.nan))
 
-    # Print final scores clearly
-    print("Final test scores:")
+    # Print final scores
+    print("Final test metrics:")
     print("auc:", auc)
     print("auprc:", auprc)
     print("f1:", f1)
 
-    # Match your screenshot-style output
     out_dir = os.path.join("experiments", "medication_records", "results")
     os.makedirs(out_dir, exist_ok=True)
 
     results = {
         "task": "Medication record prediction (binary)",
-        "label": "has_any_prescriptions_record",
-        "observation_window_days": OBS_DAYS,
-        "tables": [
-            "LABEVENTS",
-            "DIAGNOSES_ICD",
-            "PROCEDURES_ICD",
-            "PRESCRIPTIONS",
-        ],
         "model": "Transformer",
+        "observation_window_days": OBS_DAYS,
         "max_codes_per_table": MAX_CODES_PER_TABLE,
-        "label_stats": {"train": tr, "val": va, "test": te},
         "metrics": {
             "auc": auc,
             "auprc": auprc,
