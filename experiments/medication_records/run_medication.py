@@ -1,7 +1,8 @@
-# Medication record prediction (binary)
+# run_meds.py
+# Task: Medication record prediction (binary)
 # Label: 1 if this admission has any PRESCRIPTIONS record, else 0
 # Features: early admission events within first OBS_DAYS
-# Tables: LABEVENTS + DIAGNOSES_ICD + PROCEDURES_ICD
+# Tables (features): LABEVENTS + DIAGNOSES_ICD + PROCEDURES_ICD
 # Model: PyHealth Transformer
 # Metrics: AUC, AUPRC, F1
 
@@ -27,7 +28,6 @@ EMPTY_DEMO = "__EMPTY_DEMO__"
 
 
 def first_attr(obj, keys):
-    # Return the first non-None attribute among keys
     for k in keys:
         v = getattr(obj, k, None)
         if v is not None:
@@ -36,7 +36,6 @@ def first_attr(obj, keys):
 
 
 def dedup_cap(seq, max_len):
-    # Deduplicate while keeping order, then cap length
     seen = set()
     out = []
     for x in seq:
@@ -68,7 +67,6 @@ def event_time(ev):
 
 
 def event_code(ev):
-    # Common fields across different event objects
     c = first_attr(
         ev,
         ["code", "itemid", "ITEMID", "icd_code", "icd9_code", "ndc", "rxnorm", "drug", "drug_name"],
@@ -79,7 +77,6 @@ def event_code(ev):
 
 
 def codes_in_window(visit, table, admit_t, end_t, allow_no_time):
-    # Collect codes in [admit_t, end_t]
     try:
         evs = visit.get_event_list(table=table)
     except Exception:
@@ -104,7 +101,6 @@ def codes_in_window(visit, table, admit_t, end_t, allow_no_time):
 
 
 def demo_tokens(patient, visit, admit_t):
-    # Simple categorical tokens
     toks = []
 
     gender = first_attr(patient, ["gender", "sex"])
@@ -123,7 +119,6 @@ def demo_tokens(patient, visit, admit_t):
     if admission_type is not None:
         toks.append("admtype_" + str(admission_type))
 
-    # Optional age bin if DOB exists
     dob = first_attr(patient, ["dob", "birth_datetime", "birthdate"])
     if dob is not None and admit_t is not None:
         try:
@@ -145,7 +140,6 @@ def demo_tokens(patient, visit, admit_t):
 
 
 def has_any_prescription(visit):
-    # Label definition: any PRESCRIPTIONS record during this admission
     try:
         evs = visit.get_event_list(table="PRESCRIPTIONS")
     except Exception:
@@ -153,12 +147,10 @@ def has_any_prescription(visit):
     return 1 if len(evs) > 0 else 0
 
 
-# Task: patient -> samples
 def meds_task_fn(patient):
     samples = []
     obs_delta = timedelta(days=OBS_DAYS)
 
-    # Sort visits by admission time for stability
     visits = []
     for v in patient:
         a = visit_admit(v)
@@ -177,19 +169,15 @@ def meds_task_fn(patient):
         if disch_t < obs_end:
             obs_end = disch_t
 
-        # If the whole stay is within obs window, "no time" events are safer
         stay_leq_obs = disch_t <= (admit_t + obs_delta)
 
-        # Features (early window)
         lab = codes_in_window(visit, "LABEVENTS", admit_t, obs_end, allow_no_time=False)
         dx = codes_in_window(visit, "DIAGNOSES_ICD", admit_t, obs_end, allow_no_time=stay_leq_obs)
         px = codes_in_window(visit, "PROCEDURES_ICD", admit_t, obs_end, allow_no_time=stay_leq_obs)
         demo = demo_tokens(patient, visit, admit_t)
 
-        # Label (full stay)
         label = has_any_prescription(visit)
 
-        # Skip if truly no features at all
         if (not lab) and (not dx) and (not px) and (not demo):
             continue
 
@@ -209,7 +197,6 @@ def meds_task_fn(patient):
 
 
 def label_stats(ds):
-    # split_by_patient may return a Subset-like object, so iterate safely
     ys = [s["label"] for s in ds]
     if len(ys) == 0:
         return {"n": 0, "pos_rate": float("nan"), "pos": 0, "neg": 0}
@@ -226,7 +213,6 @@ def main():
 
     data_root = os.path.expanduser("~/data/mimiciii")
 
-    # Load only needed tables (PRESCRIPTIONS needed for label existence check)
     dataset = MIMIC3Dataset(
         root=data_root,
         tables=["LABEVENTS", "DIAGNOSES_ICD", "PROCEDURES_ICD", "PRESCRIPTIONS"],
@@ -263,22 +249,37 @@ def main():
 
     test_metrics = trainer.evaluate(test_loader)
 
-    out_dir = os.path.join("experiments", "meds", "results")
+    auc = float(test_metrics.get("roc_auc", np.nan))
+    auprc = float(test_metrics.get("pr_auc", np.nan))
+    f1 = float(test_metrics.get("f1", np.nan))
+
+    # Print final scores clearly
+    print("Final test scores:")
+    print("auc:", auc)
+    print("auprc:", auprc)
+    print("f1:", f1)
+
+    # Match your screenshot-style output
+    out_dir = os.path.join("experiments", "medication_records", "results")
     os.makedirs(out_dir, exist_ok=True)
 
     results = {
         "task": "Medication record prediction (binary)",
         "label": "has_any_prescriptions_record",
         "observation_window_days": OBS_DAYS,
-        "tables_features": ["LABEVENTS", "DIAGNOSES_ICD", "PROCEDURES_ICD"],
-        "table_label_source": ["PRESCRIPTIONS"],
+        "tables": [
+            "LABEVENTS",
+            "DIAGNOSES_ICD",
+            "PROCEDURES_ICD",
+            "PRESCRIPTIONS",
+        ],
         "model": "Transformer",
         "max_codes_per_table": MAX_CODES_PER_TABLE,
         "label_stats": {"train": tr, "val": va, "test": te},
         "metrics": {
-            "auc": float(test_metrics.get("roc_auc", np.nan)),
-            "auprc": float(test_metrics.get("pr_auc", np.nan)),
-            "f1": float(test_metrics.get("f1", np.nan)),
+            "auc": auc,
+            "auprc": auprc,
+            "f1": f1,
         },
     }
 
@@ -286,7 +287,6 @@ def main():
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 
-    print("Test metrics:", results["metrics"])
     print("Saved:", out_path)
 
 
